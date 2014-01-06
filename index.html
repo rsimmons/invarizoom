@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Invarizoom</title>
+<meta name="viewport" content="width=device-width">
+<style type="text/css">
+body {
+    overflow: hidden;
+    font-family: "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif;
+}
+
+#main {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    box-sizing: border-box;
+    /*border:50px solid white;*/
+}
+
+#control-panel {
+    display: none;
+    position: fixed;
+    top: 0;
+    right: 0;
+    padding: 5px;
+    box-sizing: border-box;
+    background-color: rgba(87,107,133,0.8);
+}
+</style>
+</head>
+<body>
+<canvas id="main"></canvas>
+<div id="control-panel">
+</div>
+<script>
+"use strict";
+
+window.requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
+
+function assert(test) {
+    if (!test) {
+        throw "assertion fail";
+    }
+}
+
+function drawCircle(ctx, cx, cy, radius) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, 2*Math.PI, false);
+    ctx.fillStyle = "black";
+    ctx.fill();
+    // ctx.lineWidth = 1;
+    // ctx.strokeStyle = "#003300";
+    // ctx.stroke();
+    ctx.closePath();
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    // var bodyElem = document.getElementByTagName("body");
+    // console.log(bodyElem.
+    var canvas = document.getElementById("main");
+    var circles = [];
+    var lastTimestamp;
+    var running = true;
+
+    function redraw(timestamp) {
+        var START_RADIUS = 0.5;
+
+        //console.log("redraw", timestamp);
+        if (canvas.width !== canvas.offsetWidth) {
+            canvas.width = canvas.offsetWidth;
+        }
+        if (canvas.height !== canvas.offsetHeight) {
+            canvas.height = canvas.offsetHeight;
+        }
+
+        var canvasHalfwidth = 0.5*canvas.width;
+        var canvasHalfheight = 0.5*canvas.height;
+
+        if (lastTimestamp) {
+            var dt = 0.001*(timestamp - lastTimestamp);
+            console.log(dt);
+
+            var zoomFactor = 1 + 0.2*dt;
+            var culledCircles = [];
+            for (var i = 0; i < circles.length; i++) {
+                var c = circles[i];
+                c.x *= zoomFactor;
+                c.y *= zoomFactor;
+                c.r *= zoomFactor;
+
+                if (((c.x+c.r) > -canvasHalfwidth) && ((c.x-c.r) < canvasHalfwidth) && ((c.y+c.r) > -canvasHalfheight) && ((c.y-c.r) < canvasHalfheight)) {
+                    culledCircles.push(c);
+                }
+            }
+            circles = culledCircles;
+
+            // randomly generate proportional to view area
+            var viewArea = canvas.width*canvas.height;
+
+            var densityFactor = 0.05;
+            var addCount = densityFactor*Math.log(zoomFactor)*viewArea/START_RADIUS;
+
+            for (var i = 0; i < addCount; i++) {
+                var c = {
+                    x: (Math.random()-0.5)*canvas.width,
+                    y: (Math.random()-0.5)*canvas.height,
+                    r: START_RADIUS
+                }
+
+                // add new circle if it doesn't cover origin
+                if ((c.x*c.x + c.y*c.y) > c.r*c.r) {
+                    circles.push(c);
+                }
+            }
+        }
+        lastTimestamp = timestamp;
+
+        var ctx = canvas.getContext("2d");
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (var i = 0; i < circles.length; i++) {
+            var c = circles[i];
+            drawCircle(ctx, canvasHalfwidth + c.x, canvasHalfheight + c.y, c.r);
+        }
+
+        if (running) {
+            requestAnimationFrame(redraw);
+        }
+    }
+
+    requestAnimationFrame(redraw);
+
+    // toggling control panel
+    var controlPanelElem = document.getElementById("control-panel");
+    var controlPanelShown = true;
+    document.addEventListener("keydown", function(e) {
+        if (e.keyCode === 27) {
+            if (controlPanelShown) {
+                controlPanelElem.setAttribute("style", "display:none");
+            } else {
+                controlPanelElem.setAttribute("style", "display:block");
+            }
+            controlPanelShown = !controlPanelShown;
+        } else if (e.keyCode === 32) {
+            running = !running;
+            if (running) {
+                requestAnimationFrame(redraw);
+            } else {
+                lastTimestamp = undefined;
+            }
+        }
+    }, false);
+
+}, false);
+</script>
+</body>
+</html>
