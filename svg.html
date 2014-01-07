@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Invarizoom</title>
+<meta name="viewport" content="width=device-width">
+<style type="text/css">
+body {
+    overflow: hidden;
+    font-family: "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif;
+}
+
+#main {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    box-sizing: border-box;
+    /*border:50px solid white;*/
+}
+
+#control-panel {
+    display: none;
+    position: fixed;
+    top: 0;
+    right: 0;
+    padding: 5px;
+    box-sizing: border-box;
+    background-color: rgba(87,107,133,0.8);
+}
+</style>
+</head>
+<body>
+<svg id="main" version="1.1">
+    <rect x="0" y="0" width="100%" height="100%" stroke="none" fill="white"/>
+</svg>
+<div id="control-panel">
+</div>
+<script>
+"use strict";
+
+window.requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
+
+function assert(test) {
+    if (!test) {
+        throw "assertion fail";
+    }
+}
+
+var SVGNS = "http://www.w3.org/2000/svg";
+
+function svgElem(name, attrs) {
+    var elem = document.createElementNS(SVGNS, name);
+
+    if (attrs) {
+        for (var k in attrs) {
+            if (attrs.hasOwnProperty(k)) {
+                elem.setAttributeNS(null, k, attrs[k]);
+            }
+        }
+    }
+
+    return elem;
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    // var bodyElem = document.getElementByTagName("body");
+    // console.log(bodyElem.
+    var svg = document.getElementById("main");
+    var circles = [];
+    var lastTimestamp;
+    var running = true;
+
+    function redraw(timestamp) {
+        var START_RADIUS = 0.5;
+
+        //console.log("redraw", timestamp);
+        var canvasHalfwidth = 0.5*svg.offsetWidth;
+        var canvasHalfheight = 0.5*svg.offsetHeight;
+
+        if (lastTimestamp) {
+            // var dt = 0.001*(timestamp - lastTimestamp);
+            var dt = 0.05;
+            console.log(dt);
+            console.log(circles.length);
+
+            var zoomFactor = 1 + 0.2*dt;
+            var culledCircles = [];
+            for (var i = 0; i < circles.length; i++) {
+                var c = circles[i];
+                c.x *= zoomFactor;
+                c.y *= zoomFactor;
+                c.r *= zoomFactor;
+
+                if (((c.x+c.r) > -canvasHalfwidth) && ((c.x-c.r) < canvasHalfwidth) && ((c.y+c.r) > -canvasHalfheight) && ((c.y-c.r) < canvasHalfheight)) {
+                    culledCircles.push(c);
+                } else {
+                    // remove DOM element
+                    svg.removeChild(c.elem);
+                }
+            }
+            circles = culledCircles;
+
+            // randomly generate proportional to view area
+            var viewArea = svg.offsetWidth*svg.offsetHeight;
+
+            var densityFactor = 0.05;
+            var addCount = densityFactor*Math.log(zoomFactor)*viewArea/START_RADIUS;
+
+            for (var i = 0; i < addCount; i++) {
+                var c = {
+                    x: (Math.random()-0.5)*svg.offsetWidth,
+                    y: (Math.random()-0.5)*svg.offsetHeight,
+                    r: START_RADIUS
+                }
+
+                // add new circle if it doesn't cover origin
+                if ((c.x*c.x + c.y*c.y) > c.r*c.r) {
+                    c.elem = svgElem("circle", {fill: "black", stroke: "none", r: c.r, cx: c.x, cy: c.y});
+                    svg.appendChild(c.elem);
+                    circles.push(c);
+                }
+            }
+        }
+        lastTimestamp = timestamp;
+
+        for (var i = 0; i < circles.length; i++) {
+            var c = circles[i];
+            c.elem.setAttributeNS(null, "cx", canvasHalfwidth + c.x);
+            c.elem.setAttributeNS(null, "cy", canvasHalfheight + c.y);
+            c.elem.setAttributeNS(null, "r", c.r);
+        }
+
+        if (running) {
+            requestAnimationFrame(redraw);
+        }
+    }
+
+    requestAnimationFrame(redraw);
+
+    // toggling control panel
+    var controlPanelElem = document.getElementById("control-panel");
+    var controlPanelShown = true;
+    document.addEventListener("keydown", function(e) {
+        if (e.keyCode === 27) {
+            if (controlPanelShown) {
+                controlPanelElem.setAttribute("style", "display:none");
+            } else {
+                controlPanelElem.setAttribute("style", "display:block");
+            }
+            controlPanelShown = !controlPanelShown;
+        } else if (e.keyCode === 32) {
+            running = !running;
+            if (running) {
+                requestAnimationFrame(redraw);
+            } else {
+                lastTimestamp = undefined;
+            }
+        }
+    }, false);
+
+}, false);
+</script>
+</body>
+</html>
